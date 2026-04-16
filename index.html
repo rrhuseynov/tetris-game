@@ -6,15 +6,14 @@
 <title>Tetris Mobile</title>
 
 <style>
-body{
+html, body {
  margin:0;
+ padding:0;
+ height:100%;
  background:#020617;
  color:#fff;
  font-family:Arial;
  overflow:hidden;
- display:flex;
- flex-direction:column;
- height:100vh;
 }
 
 #top{
@@ -25,7 +24,8 @@ body{
 }
 
 #gameWrapper{
- flex:1;
+ width:100%;
+ height:calc(100vh - 50px);
  display:flex;
  justify-content:center;
  align-items:center;
@@ -54,21 +54,28 @@ const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
 
 function resize(){
- const ratio=10/20;
- let h=window.innerHeight-50;
- let w=h*ratio;
+ const ratio = 10/20;
 
- if(w>window.innerWidth){
-  w=window.innerWidth;
-  h=w/ratio;
+ let w = window.innerWidth;
+ let h = window.innerHeight - 60;
+
+ let newW = h * ratio;
+ let newH = h;
+
+ if(newW > w){
+  newW = w * 0.95;
+  newH = newW / ratio;
  }
 
- canvas.width=w;
- canvas.height=h;
+ canvas.style.width = newW + "px";
+ canvas.style.height = newH + "px";
+
+ canvas.width = 10;
+ canvas.height = 20;
 
  ctx.setTransform(
-  w/10,0,
-  0,h/20,
+  newW/10,0,
+  0,newH/20,
   0,0
  );
 }
