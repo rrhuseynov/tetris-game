@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Tetris Final</title>
+<title>Tetris Mobile</title>
 
 <style>
 body{
@@ -12,48 +12,28 @@ body{
  color:#fff;
  font-family:Arial;
  overflow:hidden;
+ display:flex;
+ flex-direction:column;
+ height:100vh;
 }
 
 #top{
  display:flex;
  justify-content:space-between;
- padding:10px;
+ padding:10px 15px;
+ font-size:16px;
+}
+
+#gameWrapper{
+ flex:1;
+ display:flex;
+ justify-content:center;
+ align-items:center;
 }
 
 canvas{
  background:#000;
- border-radius:8px;
-}
-
-#controls{
- position:fixed;
- bottom:10px;
- left:50%;
- transform:translateX(-50%);
-}
-
-.btn{
- width:60px;height:60px;
- margin:5px;
- border:none;
- border-radius:50%;
- background:#22c55e;
- font-size:20px;
-}
-
-#overlay{
- position:fixed;
- top:0;
- left:0;
- width:100%;
- height:100%;
- background:rgba(0,0,0,0.8);
- display:flex;
- flex-direction:column;
- justify-content:center;
- align-items:center;
- font-size:24px;
- display:none;
+ border-radius:12px;
 }
 </style>
 </head>
@@ -63,44 +43,42 @@ canvas{
 <div id="top">
  <div>Score: <span id="score">0</span></div>
  <div>Best: <span id="best">0</span></div>
- <button onclick="togglePause()">⏸</button>
- <button onclick="toggleSound()">🔊</button>
 </div>
 
-<canvas id="game" width="200" height="400"></canvas>
-
-<div id="controls">
- <button class="btn" onclick="move(-1)">←</button>
- <button class="btn" onclick="rotatePiece()">⟳</button>
- <button class="btn" onclick="move(1)">→</button>
- <button class="btn" onclick="drop()">↓</button>
- <button class="btn" onclick="hardDrop()">⏬</button>
+<div id="gameWrapper">
+ <canvas id="game"></canvas>
 </div>
-
-<div id="overlay">
- <div id="overText">GAME OVER</div>
- <button onclick="restart()">Restart</button>
-</div>
-
-<audio id="music" loop src="https://cdn.pixabay.com/download/audio/2022/03/15/audio.mp3"></audio>
 
 <script>
 const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
-ctx.scale(20,20);
+
+function resize(){
+ const ratio=10/20;
+ let h=window.innerHeight-50;
+ let w=h*ratio;
+
+ if(w>window.innerWidth){
+  w=window.innerWidth;
+  h=w/ratio;
+ }
+
+ canvas.width=w;
+ canvas.height=h;
+
+ ctx.setTransform(
+  w/10,0,
+  0,h/20,
+  0,0
+ );
+}
+
+window.addEventListener('resize',resize);
+resize();
 
 const arena=Array.from({length:20},()=>Array(10).fill(0));
 const colors=[null,'red','yellow','orange','blue','cyan','green','purple'];
 const pieces='TJLOSZI';
-
-let player={pos:{x:0,y:0},matrix:null};
-let score=0;
-let best=localStorage.getItem("best")||0;
-let paused=false;
-let gameOver=false;
-let sound=true;
-
-function rand(){return createPiece(pieces[Math.random()*7|0]);}
 
 function createPiece(t){
  switch(t){
@@ -114,23 +92,25 @@ function createPiece(t){
  }
 }
 
+let player={pos:{x:0,y:0},matrix:null};
+let score=0;
+let best=localStorage.getItem("best")||0;
+
+function drawMatrix(m,o){
+ m.forEach((r,y)=>r.forEach((v,x)=>{
+  if(v){
+   ctx.fillStyle=colors[v];
+   ctx.fillRect(x+o.x,y+o.y,1,1);
+  }
+ }));
+}
+
 function draw(){
  ctx.fillStyle="#000";
- ctx.fillRect(0,0,200,400);
+ ctx.fillRect(0,0,10,20);
 
- arena.forEach((r,y)=>r.forEach((v,x)=>{
-  if(v){
-   ctx.fillStyle=colors[v];
-   ctx.fillRect(x,y,1,1);
-  }
- }));
-
- player.matrix.forEach((r,y)=>r.forEach((v,x)=>{
-  if(v){
-   ctx.fillStyle=colors[v];
-   ctx.fillRect(x+player.pos.x,y+player.pos.y,1,1);
-  }
- }));
+ drawMatrix(arena,{x:0,y:0});
+ drawMatrix(player.matrix,player.pos);
 }
 
 function collide(){
@@ -151,37 +131,28 @@ function merge(){
 }
 
 function sweep(){
- let rows=[];
- for(let y=0;y<arena.length;y++){
+ for(let y=arena.length-1;y>=0;y--){
   if(arena[y].every(v=>v)){
-   rows.push(y);
-  }
- }
-
- rows.forEach(y=>{
-  arena[y].fill(0);
- });
-
- setTimeout(()=>{
-  rows.forEach(y=>{
    arena.splice(y,1);
    arena.unshift(new Array(10).fill(0));
    score+=10;
-  });
- },100);
+  }
+ }
 }
 
 function reset(){
- player.matrix=rand();
+ player.matrix=createPiece(pieces[Math.random()*7|0]);
  player.pos={x:3,y:0};
 
  if(collide()){
-  gameOver=true;
-  document.getElementById("overlay").style.display="flex";
+  arena.forEach(r=>r.fill(0));
+
   if(score>best){
    best=score;
    localStorage.setItem("best",best);
   }
+
+  score=0;
  }
 }
 
@@ -191,7 +162,6 @@ function updateUI(){
 }
 
 function drop(){
- if(paused||gameOver)return;
  player.pos.y++;
  if(collide()){
   player.pos.y--;
@@ -201,22 +171,12 @@ function drop(){
  }
 }
 
-function hardDrop(){
- while(!collide()){
-  player.pos.y++;
- }
- player.pos.y--;
- drop();
-}
-
 function move(d){
- if(paused)return;
  player.pos.x+=d;
  if(collide())player.pos.x-=d;
 }
 
 function rotatePiece(){
- if(paused)return;
  const m=player.matrix;
  const r=m[0].map((_,i)=>m.map(r=>r[i])).reverse();
  const old=player.matrix;
@@ -224,49 +184,48 @@ function rotatePiece(){
  if(collide())player.matrix=old;
 }
 
-function togglePause(){
- paused=!paused;
-}
+/* TOUCH CONTROL */
+let startX=0,startY=0;
 
-function toggleSound(){
- sound=!sound;
- const music=document.getElementById("music");
- if(sound)music.play(); else music.pause();
-}
+canvas.addEventListener("touchstart",e=>{
+ startX=e.touches[0].clientX;
+ startY=e.touches[0].clientY;
+});
 
-function restart(){
- arena.forEach(r=>r.fill(0));
- score=0;
- gameOver=false;
- document.getElementById("overlay").style.display="none";
- reset();
-}
+canvas.addEventListener("touchend",e=>{
+ let dx=e.changedTouches[0].clientX-startX;
+ let dy=e.changedTouches[0].clientY-startY;
 
+ if(Math.abs(dx)<10 && Math.abs(dy)<10){
+  rotatePiece(); // TAP
+  return;
+ }
+
+ if(Math.abs(dx)>Math.abs(dy)){
+  if(dx>20)move(1);
+  else if(dx<-20)move(-1);
+ }else{
+  if(dy>20)drop();
+ }
+});
+
+/* LOOP */
 let last=0,dropCounter=0,interval=700;
 
 function update(t=0){
  const dt=t-last;
  last=t;
- if(!paused&&!gameOver){
-  dropCounter+=dt;
-  if(dropCounter>interval){
-   drop();
-   dropCounter=0;
-  }
+ dropCounter+=dt;
+
+ if(dropCounter>interval){
+  drop();
+  dropCounter=0;
  }
 
  draw();
  updateUI();
  requestAnimationFrame(update);
 }
-
-document.addEventListener("keydown",e=>{
- if(e.keyCode===37)move(-1);
- if(e.keyCode===39)move(1);
- if(e.keyCode===40)drop();
- if(e.keyCode===38)rotatePiece();
- if(e.keyCode===32)hardDrop();
-});
 
 reset();
 update();
