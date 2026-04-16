@@ -4,30 +4,32 @@
 <meta charset="UTF-8">
 <title>Tetris</title>
 <style>
- body{margin:0;font-family:Arial;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:#fff;text-align:center}
- h1{margin-top:20px;text-shadow:0 0 10px #00f0ff}
- .wrap{display:flex;justify-content:center;gap:30px;align-items:flex-start;margin-top:20px}
- canvas{background:#111;border:2px solid #555;box-shadow:0 0 20px rgba(0,255,255,0.3)}
- #next{box-shadow:0 0 15px rgba(255,255,255,0.2)}
- p{margin:5px}
- button{padding:8px 15px;margin:5px;border:none;border-radius:8px;background:#00f0ff;color:#000;font-weight:bold;cursor:pointer}
+body{margin:0;font-family:Arial;background:#0f2027;color:#fff;text-align:center}
+canvas{background:#111;display:block;margin:auto}
+#controls{
+ position:fixed;
+ bottom:10px;
+ left:50%;
+ transform:translateX(-50%);
+}
+.btn{
+ width:60px;height:60px;margin:5px;
+ font-size:20px;
+ border:none;border-radius:10px;
+ background:#00f0ff;color:#000;
+}
 </style>
 </head>
 <body>
-<h1>Tetris 🎮</h1>
-<div>
-  <span id="score">Score: 0</span> |
-  <span id="level">Level: 1</span> |
-  <span id="record">Best: 0</span>
-  <button onclick="restartGame()">Restart</button>
-</div>
 
-<div class="wrap">
-  <canvas id="game" width="200" height="400"></canvas>
-  <div>
-    <p>Next:</p>
-    <canvas id="next" width="80" height="80"></canvas>
-  </div>
+<h2>Tetris 🎮</h2>
+<canvas id="game" width="200" height="400"></canvas>
+
+<div id="controls">
+ <button class="btn" onclick="move(-1)">←</button>
+ <button class="btn" onclick="rotatePiece()">⟳</button>
+ <button class="btn" onclick="move(1)">→</button>
+ <button class="btn" onclick="drop()">↓</button>
 </div>
 
 <script>
@@ -35,152 +37,122 @@ const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
 ctx.scale(20,20);
 
-const nextCanvas=document.getElementById('next');
-const nextCtx=nextCanvas.getContext('2d');
-nextCtx.scale(20,20);
-
-let best=localStorage.getItem('tetris_best')||0;
-document.getElementById('record').innerText='Best: '+best;
-
-let offsetY=0;
-let paused=false;
-
-function restartGame(){arena.forEach(r=>r.fill(0));player.score=0;playerReset();paused=false;}
-
 function createMatrix(w,h){const m=[];while(h--)m.push(new Array(w).fill(0));return m;}
-
-function createPiece(t){switch(t){case 'T':return[[0,1,0],[1,1,1],[0,0,0]];case 'O':return[[2,2],[2,2]];case 'L':return[[0,3,0],[0,3,0],[0,3,3]];case 'J':return[[0,4,0],[0,4,0],[4,4,0]];case 'I':return[[0,5,0,0],[0,5,0,0],[0,5,0,0],[0,5,0,0]];case 'S':return[[0,6,6],[6,6,0],[0,0,0]];case 'Z':return[[7,7,0],[0,7,7],[0,0,0]];}}
+function createPiece(t){
+ switch(t){
+  case 'T':return[[0,1,0],[1,1,1],[0,0,0]];
+  case 'O':return[[2,2],[2,2]];
+  case 'L':return[[0,3,0],[0,3,0],[0,3,3]];
+  case 'J':return[[0,4,0],[0,4,0],[4,4,0]];
+  case 'I':return[[0,5,0,0],[0,5,0,0],[0,5,0,0],[0,5,0,0]];
+  case 'S':return[[0,6,6],[6,6,0],[0,0,0]];
+  case 'Z':return[[7,7,0],[0,7,7],[0,0,0]];
+ }
+}
 
 const colors=[null,'red','yellow','orange','blue','cyan','green','purple'];
 
-function drawMatrix(m,o,alpha=1,useOffset=true){
- ctx.globalAlpha=alpha;
+function drawMatrix(m,o){
  m.forEach((r,y)=>r.forEach((v,x)=>{
-   if(v){
-     ctx.fillStyle=colors[v];
-     ctx.shadowColor=colors[v];
-     ctx.shadowBlur=10;
-     const yOffset = useOffset ? offsetY : 0;
-     ctx.fillRect(x+o.x,y+o.y+yOffset,1,1);
-     ctx.shadowBlur=0;
-   }
+  if(v){
+   ctx.fillStyle=colors[v];
+   ctx.fillRect(x+o.x,y+o.y,1,1);
+  }
  }));
- ctx.globalAlpha=1;
 }
 
 function draw(){
  ctx.fillStyle='#000';
  ctx.fillRect(0,0,canvas.width,canvas.height);
- ctx.strokeStyle='#222';
- for(let x=0;x<10;x++){
-  for(let y=0;y<20;y++){
-    ctx.strokeRect(x,y,1,1);
-  }
- }
- drawMatrix(arena,{x:0,y:0},1,false);
- drawGhost();
+ drawMatrix(arena,{x:0,y:0});
  drawMatrix(player.matrix,player.pos);
 }
 
-function drawGhost(){
- let ghostY=player.pos.y;
- while(!collide(arena,{matrix:player.matrix,pos:{x:player.pos.x,y:ghostY}})){
-  ghostY++;
+function collide(arena,p){
+ const[m,o]=[p.matrix,p.pos];
+ for(let y=0;y<m.length;y++){
+  for(let x=0;x<m[y].length;x++){
+   if(m[y][x]&&(arena[y+o.y]&&arena[y+o.y][x+o.x])!==0){
+    return true;
+   }
+  }
  }
- ghostY--;
- drawMatrix(player.matrix,{x:player.pos.x,y:ghostY},0.3,false);
+ return false;
 }
 
-function drawNext(){
- nextCtx.fillStyle='#000';
- nextCtx.fillRect(0,0,nextCanvas.width,nextCanvas.height);
- if(nextPiece){
-  nextPiece.forEach((row,y)=>{
-    row.forEach((value,x)=>{
-      if(value){
-        nextCtx.fillStyle=colors[value];
-        nextCtx.fillRect(x,y,1,1);
-      }
-    });
-  });
- }
+function merge(arena,p){
+ p.matrix.forEach((r,y)=>r.forEach((v,x)=>{
+  if(v)arena[y+p.pos.y][x+p.pos.x]=v;
+ }));
 }
 
-function collide(arena,p){const[m,o]=[p.matrix,p.pos];for(let y=0;y<m.length;y++)for(let x=0;x<m[y].length;x++)if(m[y][x]&&(arena[y+o.y]&&arena[y+o.y][x+o.x])!==0)return true;return false;}
+function rotate(m){
+ for(let y=0;y<m.length;y++){
+  for(let x=0;x<y;x++){
+   [m[x][y],m[y][x]]=[m[y][x],m[x][y]];
+  }
+ }
+ m.forEach(r=>r.reverse());
+}
 
-function merge(arena,p){p.matrix.forEach((r,y)=>r.forEach((v,x)=>{if(v)arena[y+p.pos.y][x+p.pos.x]=v;}));}
+function playerReset(){
+ const pieces='TJLOSZI';
+ player.matrix=createPiece(pieces[Math.random()*pieces.length|0]);
+ player.pos.y=0;
+ player.pos.x=(arena[0].length/2|0)-(player.matrix[0].length/2|0);
+}
 
-function rotate(m){for(let y=0;y<m.length;y++)for(let x=0;x<y;x++)[m[x][y],m[y][x]]=[m[y][x],m[x][y]];m.forEach(r=>r.reverse());}
-
-function playerRotate(){rotate(player.matrix);}
-
-function playerDrop(){
- offsetY=0;
+function drop(){
  player.pos.y++;
  if(collide(arena,player)){
   player.pos.y--;
   merge(arena,player);
-  arenaSweep();
   playerReset();
  }
  dropCounter=0;
 }
 
-function hardDrop(){while(!collide(arena,player))player.pos.y++;player.pos.y--;merge(arena,player);arenaSweep();playerReset();dropCounter=0;}
-
-function playerMove(d){player.pos.x+=d;if(collide(arena,player))player.pos.x-=d;}
-
-function arenaSweep(){outer:for(let y=arena.length-1;y>0;y--){for(let x=0;x<arena[y].length;x++)if(arena[y][x]===0)continue outer;const row=arena.splice(y,1)[0].fill(0);arena.unshift(row);y++;player.score+=10;}}
-
-let nextPiece=null;
-
-function playerReset(){const pieces='TJLOSZI';player.matrix=nextPiece||createPiece(pieces[Math.random()*pieces.length|0]);nextPiece=createPiece(pieces[Math.random()*pieces.length|0]);player.pos.y=0;player.pos.x=(arena[0].length/2|0)-(player.matrix[0].length/2|0);
+function move(dir){
+ player.pos.x+=dir;
  if(collide(arena,player)){
-  arena.forEach(r=>r.fill(0));
-  if(player.score>best){best=player.score;localStorage.setItem('tetris_best',best);} 
-  player.score=0;
- }}
+  player.pos.x-=dir;
+ }
+}
 
-let dropCounter=0;let dropInterval=1000;let lastTime=0;
+function rotatePiece(){
+ rotate(player.matrix);
+}
+
+let dropCounter=0;
+let dropInterval=1000;
+let lastTime=0;
 
 function update(time=0){
- if(paused){requestAnimationFrame(update);return;}
  const dt=time-lastTime;
  lastTime=time;
  dropCounter+=dt;
 
- offsetY = Math.min(1, dropCounter / dropInterval);
-
  if(dropCounter>dropInterval){
-  playerDrop();
+  drop();
  }
 
- dropInterval=Math.max(200,1000-player.score*2);
-
  draw();
- drawNext();
-
- document.getElementById('score').innerText='Score: '+player.score;
- document.getElementById('level').innerText='Level: '+(Math.floor(player.score/100)+1);
- document.getElementById('record').innerText='Best: '+best;
-
  requestAnimationFrame(update);
 }
 
- document.addEventListener('keydown',e=>{
- if(e.keyCode===37)playerMove(-1);
- else if(e.keyCode===39)playerMove(1);
- else if(e.keyCode===40)playerDrop();
- else if(e.keyCode===38)playerRotate();
- else if(e.code==='Space')hardDrop();
- else if(e.key==='p'||e.key==='P')paused=!paused;
+document.addEventListener('keydown',e=>{
+ if(e.keyCode===37)move(-1);
+ else if(e.keyCode===39)move(1);
+ else if(e.keyCode===40)drop();
+ else if(e.keyCode===38)rotatePiece();
 });
 
 const arena=createMatrix(10,20);
-const player={pos:{x:0,y:0},matrix:null,score:0};
+const player={pos:{x:0,y:0},matrix:null};
 
 playerReset();
 update();
 </script>
+
 </body>
 </html>
