@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Tetris Mobile</title>
+<title>Tetris</title>
 
 <style>
 html, body {
@@ -103,7 +103,13 @@ let player={pos:{x:0,y:0},matrix:null};
 let score=0;
 let best=localStorage.getItem("best")||0;
 
+function playerReset(){
+ player.matrix=createPiece(pieces[Math.random()*7|0]);
+ player.pos={x:3,y:0};
+}
+
 function drawMatrix(m,o){
+ if(!m) return;
  m.forEach((r,y)=>r.forEach((v,x)=>{
   if(v){
    ctx.fillStyle=colors[v];
@@ -148,8 +154,7 @@ function sweep(){
 }
 
 function reset(){
- player.matrix=createPiece(pieces[Math.random()*7|0]);
- player.pos={x:3,y:0};
+ playerReset();
 
  if(collide()){
   arena.forEach(r=>r.fill(0));
@@ -169,6 +174,8 @@ function updateUI(){
 }
 
 function drop(){
+ if(!player.matrix) return;
+
  player.pos.y++;
  if(collide()){
   player.pos.y--;
@@ -179,11 +186,15 @@ function drop(){
 }
 
 function move(d){
+ if(!player.matrix) return;
+
  player.pos.x+=d;
  if(collide())player.pos.x-=d;
 }
 
 function rotatePiece(){
+ if(!player.matrix) return;
+
  const m=player.matrix;
  const r=m[0].map((_,i)=>m.map(r=>r[i])).reverse();
  const old=player.matrix;
@@ -191,7 +202,7 @@ function rotatePiece(){
  if(collide())player.matrix=old;
 }
 
-/* TOUCH CONTROL */
+/* TOUCH */
 let startX=0,startY=0;
 
 canvas.addEventListener("touchstart",e=>{
@@ -204,7 +215,7 @@ canvas.addEventListener("touchend",e=>{
  let dy=e.changedTouches[0].clientY-startY;
 
  if(Math.abs(dx)<10 && Math.abs(dy)<10){
-  rotatePiece(); // TAP
+  rotatePiece();
   return;
  }
 
@@ -234,7 +245,8 @@ function update(t=0){
  requestAnimationFrame(update);
 }
 
-reset();
+/* START */
+playerReset();
 update();
 </script>
 
